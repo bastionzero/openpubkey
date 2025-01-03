@@ -23,14 +23,14 @@ import (
 	"os"
 
 	"github.com/openpubkey/openpubkey/discover"
-	simpleoidc "github.com/openpubkey/openpubkey/oidc"
+	"github.com/openpubkey/openpubkey/jwsig"
 	"github.com/openpubkey/openpubkey/pktoken/clientinstance"
 )
 
 // Interface for interacting with the OP (OpenID Provider) that only returns
 // an ID Token
 type OpenIdProvider interface {
-	RequestTokens(ctx context.Context, cic *clientinstance.Claims) (*simpleoidc.Tokens, error)
+	RequestTokens(ctx context.Context, cic *clientinstance.Claims) (*jwsig.Tokens, error)
 	PublicKeyByKeyId(ctx context.Context, keyID string) (*discover.PublicKeyRecord, error)
 	PublicKeyByToken(ctx context.Context, token []byte) (*discover.PublicKeyRecord, error)
 	// Returns the OpenID provider issuer as seen in ID token e.g. "https://accounts.google.com"
@@ -46,7 +46,7 @@ type BrowserOpenIdProvider interface {
 // Interface for an OpenIdProvider that returns an ID Token, Refresh Token and Access Token
 type RefreshableOpenIdProvider interface {
 	OpenIdProvider
-	RefreshTokens(ctx context.Context, refreshToken []byte) (*simpleoidc.Tokens, error)
+	RefreshTokens(ctx context.Context, refreshToken []byte) (*jwsig.Tokens, error)
 	VerifyRefreshedIDToken(ctx context.Context, origIdt []byte, reIdt []byte) error
 }
 

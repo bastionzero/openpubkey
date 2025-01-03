@@ -1,4 +1,4 @@
-package oidc
+package jwsig
 
 type Tokens struct {
 	IDToken      []byte

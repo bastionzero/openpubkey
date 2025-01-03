@@ -22,7 +22,7 @@ import (
 
 	"github.com/awnumar/memguard"
 	"github.com/openpubkey/openpubkey/discover"
-	simpleoidc "github.com/openpubkey/openpubkey/oidc"
+	"github.com/openpubkey/openpubkey/jwsig"
 	"github.com/openpubkey/openpubkey/pktoken/clientinstance"
 )
 
@@ -32,7 +32,7 @@ type GitlabOp struct {
 	issuer                    string // Change issuer to point this to a test issuer
 	publicKeyFinder           discover.PublicKeyFinder
 	tokenEnvVar               string
-	requestTokensOverrideFunc func(string) (*simpleoidc.Tokens, error)
+	requestTokensOverrideFunc func(string) (*jwsig.Tokens, error)
 }
 
 func NewGitlabOpFromEnvironmentDefault() *GitlabOp {
@@ -61,7 +61,7 @@ func (g *GitlabOp) PublicKeyByKeyId(ctx context.Context, keyID string) (*discove
 	return g.publicKeyFinder.ByKeyID(ctx, g.issuer, keyID)
 }
 
-func (g *GitlabOp) RequestTokens(ctx context.Context, cic *clientinstance.Claims) (*simpleoidc.Tokens, error) {
+func (g *GitlabOp) RequestTokens(ctx context.Context, cic *clientinstance.Claims) (*jwsig.Tokens, error) {
 	// Define our commitment as the hash of the client instance claims
 	cicHash, err := cic.Hash()
 	if err != nil {
@@ -93,7 +93,7 @@ func (g *GitlabOp) RequestTokens(ctx context.Context, cic *clientinstance.Claims
 	if err != nil {
 		return nil, err
 	}
-	return &simpleoidc.Tokens{IDToken: []byte(gqToken)}, nil
+	return &jwsig.Tokens{IDToken: []byte(gqToken)}, nil
 }
 
 func (g *GitlabOp) Issuer() string {

@@ -24,19 +24,18 @@ import (
 	"net"
 	"net/http"
 	"net/url"
-
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/openpubkey/openpubkey/discover"
-	simpleoidc "github.com/openpubkey/openpubkey/oidc"
-	"github.com/openpubkey/openpubkey/pktoken/clientinstance"
-	"github.com/openpubkey/openpubkey/util"
 	"github.com/sirupsen/logrus"
 	"github.com/zitadel/oidc/v3/pkg/client/rp"
+	httphelper "github.com/zitadel/oidc/v3/pkg/http"
 	"github.com/zitadel/oidc/v3/pkg/oidc"
 
-	httphelper "github.com/zitadel/oidc/v3/pkg/http"
+	"github.com/openpubkey/openpubkey/discover"
+	"github.com/openpubkey/openpubkey/jwsig"
+	"github.com/openpubkey/openpubkey/pktoken/clientinstance"
+	"github.com/openpubkey/openpubkey/util"
 )
 
 const googleIssuer = "https://accounts.google.com"
@@ -92,7 +91,7 @@ type GoogleOp struct {
 	issuer                    string
 	server                    *http.Server
 	publicKeyFinder           discover.PublicKeyFinder
-	requestTokensOverrideFunc func(string) (*simpleoidc.Tokens, error)
+	requestTokensOverrideFunc func(string) (*jwsig.Tokens, error)
 	httpSessionHook           http.HandlerFunc
 }
 
@@ -151,7 +150,7 @@ var _ OpenIdProvider = (*GoogleOp)(nil)
 var _ BrowserOpenIdProvider = (*GoogleOp)(nil)
 var _ RefreshableOpenIdProvider = (*GoogleOp)(nil)
 
-func (g *GoogleOp) requestTokens(ctx context.Context, cicHash string) (*simpleoidc.Tokens, error) {
+func (g *GoogleOp) requestTokens(ctx context.Context, cicHash string) (*jwsig.Tokens, error) {
 	if g.requestTokensOverrideFunc != nil {
 		return g.requestTokensOverrideFunc(cicHash)
 	}
@@ -273,14 +272,14 @@ func (g *GoogleOp) requestTokens(ctx context.Context, cicHash string) (*simpleoi
 		return nil, err
 	case retTokens := <-chTokens:
 		// retTokens is a zitadel/oidc struct. We turn it into our simpler token struct
-		return &simpleoidc.Tokens{
+		return &jwsig.Tokens{
 			IDToken:      []byte(retTokens.IDToken),
 			RefreshToken: []byte(retTokens.RefreshToken),
 			AccessToken:  []byte(retTokens.AccessToken)}, nil
 	}
 }
 
-func (g *GoogleOp) RequestTokens(ctx context.Context, cic *clientinstance.Claims) (*simpleoidc.Tokens, error) {
+func (g *GoogleOp) RequestTokens(ctx context.Context, cic *clientinstance.Claims) (*jwsig.Tokens, error) {
 	// Define our commitment as the hash of the client instance claims
 	cicHash, err := cic.Hash()
 	if err != nil {
@@ -302,7 +301,7 @@ func (g *GoogleOp) RequestTokens(ctx context.Context, cic *clientinstance.Claims
 	return tokens, nil
 }
 
-func (g *GoogleOp) RefreshTokens(ctx context.Context, refreshToken []byte) (*simpleoidc.Tokens, error) {
+func (g *GoogleOp) RefreshTokens(ctx context.Context, refreshToken []byte) (*jwsig.Tokens, error) {
 	cookieHandler, err := configCookieHandler()
 	if err != nil {
 		return nil, err
@@ -340,7 +339,7 @@ func (g *GoogleOp) RefreshTokens(ctx context.Context, refreshToken []byte) (*sim
 		retTokens.RefreshToken = string(refreshToken)
 	}
 
-	return &simpleoidc.Tokens{
+	return &jwsig.Tokens{
 		IDToken:      []byte(retTokens.IDToken),
 		RefreshToken: []byte(retTokens.RefreshToken),
 		AccessToken:  []byte(retTokens.AccessToken)}, nil
@@ -364,10 +363,10 @@ func (g *GoogleOp) VerifyIDToken(ctx context.Context, idt []byte, cic *clientins
 }
 
 func (g *GoogleOp) VerifyRefreshedIDToken(ctx context.Context, origIdt []byte, reIdt []byte) error {
-	if err := simpleoidc.SameIdentity(origIdt, reIdt); err != nil {
+	if err := jwsig.SameIdentity(origIdt, reIdt); err != nil {
 		return fmt.Errorf("refreshed ID Token is for different subject than original ID Token: %w", err)
 	}
-	if err := simpleoidc.RequireOlder(origIdt, reIdt); err != nil {
+	if err := jwsig.RequireOlder(origIdt, reIdt); err != nil {
 		return fmt.Errorf("refreshed ID Token should not be issued before original ID Token: %w", err)
 	}
 

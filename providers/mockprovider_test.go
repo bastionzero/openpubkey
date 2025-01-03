@@ -24,7 +24,8 @@ import (
 
 	"github.com/lestrrat-go/jwx/v2/jwa"
 	"github.com/lestrrat-go/jwx/v2/jws"
-	"github.com/openpubkey/openpubkey/oidc"
+
+	"github.com/openpubkey/openpubkey/jwsig"
 	"github.com/openpubkey/openpubkey/util"
 	"github.com/stretchr/testify/require"
 )
@@ -42,7 +43,7 @@ func TestMockProviderTest(t *testing.T) {
 	require.NoError(t, err)
 	idToken := tokens.IDToken
 
-	idt, err := oidc.NewJwt(idToken)
+	idt, err := jwsig.NewJwt(idToken)
 	require.NoError(t, err)
 	require.Equal(t, idtTemplate.Issuer, idt.GetClaims().Issuer)
 	require.Equal(t, "mock-refresh-token", string(tokens.RefreshToken))

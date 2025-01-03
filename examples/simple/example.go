@@ -22,7 +22,7 @@ import (
 
 	"github.com/goccy/go-json"
 	"github.com/openpubkey/openpubkey/client"
-	"github.com/openpubkey/openpubkey/oidc"
+	"github.com/openpubkey/openpubkey/jwsig"
 	"github.com/openpubkey/openpubkey/pktoken"
 	"github.com/openpubkey/openpubkey/providers"
 	"github.com/openpubkey/openpubkey/verifier"
@@ -83,7 +83,7 @@ func Verify(op client.OpenIdProvider, pktJson []byte, signedMsg []byte) error {
 	}
 
 	// Get the signer's email address from ID Token inside the PK Token
-	idtClaims := new(oidc.OidcClaims)
+	idtClaims := new(jwsig.OidcClaims)
 	if err := json.Unmarshal(pkt.Payload, idtClaims); err != nil {
 		return err
 	}

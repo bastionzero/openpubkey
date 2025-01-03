@@ -22,8 +22,9 @@ import (
 
 	"github.com/lestrrat-go/jwx/v2/jwa"
 	"github.com/lestrrat-go/jwx/v2/jws"
+
 	"github.com/openpubkey/openpubkey/discover"
-	simpleoidc "github.com/openpubkey/openpubkey/oidc"
+	"github.com/openpubkey/openpubkey/jwsig"
 	"github.com/openpubkey/openpubkey/pktoken/clientinstance"
 	"github.com/openpubkey/openpubkey/providers/mocks"
 )
@@ -64,7 +65,7 @@ type MockProvider struct {
 	options                   MockProviderOpts
 	issuer                    string
 	publicKeyFinder           discover.PublicKeyFinder
-	requestTokensOverrideFunc func(string) (*simpleoidc.Tokens, error)
+	requestTokensOverrideFunc func(string) (*jwsig.Tokens, error)
 }
 
 // NewMockProvider creates a new mock provider with a random signing key and a random key ID. It returns the provider,
@@ -112,11 +113,11 @@ func NewMockProvider(opts MockProviderOpts) (*MockProvider, *mocks.MockProviderB
 	return provider, mockBackend, idTokenTemplate, nil
 }
 
-func (m *MockProvider) requestTokens(_ context.Context, cicHash string) (*simpleoidc.Tokens, error) {
+func (m *MockProvider) requestTokens(_ context.Context, cicHash string) (*jwsig.Tokens, error) {
 	return m.requestTokensOverrideFunc(cicHash)
 }
 
-func (m *MockProvider) RequestTokens(ctx context.Context, cic *clientinstance.Claims) (*simpleoidc.Tokens, error) {
+func (m *MockProvider) RequestTokens(ctx context.Context, cic *clientinstance.Claims) (*jwsig.Tokens, error) {
 	if m.options.CommitType.GQCommitment && !m.options.GQSign {
 		// Catch misconfigurations in tests
 		return nil, fmt.Errorf("if GQCommitment is true then GQSign must also be true")
@@ -143,7 +144,7 @@ func (m *MockProvider) RequestTokens(ctx context.Context, cic *clientinstance.Cl
 	return tokens, nil
 }
 
-func (m *MockProvider) RefreshTokens(ctx context.Context, _ []byte) (*simpleoidc.Tokens, error) {
+func (m *MockProvider) RefreshTokens(ctx context.Context, _ []byte) (*jwsig.Tokens, error) {
 	tokens, err := m.requestTokensOverrideFunc("")
 	if err != nil {
 		return nil, err
@@ -169,10 +170,10 @@ func (m *MockProvider) VerifyIDToken(ctx context.Context, idt []byte, cic *clien
 }
 
 func (m *MockProvider) VerifyRefreshedIDToken(ctx context.Context, origIdt []byte, reIdt []byte) error {
-	if err := simpleoidc.SameIdentity(origIdt, reIdt); err != nil {
+	if err := jwsig.SameIdentity(origIdt, reIdt); err != nil {
 		return fmt.Errorf("refreshed ID Token is for different subject than original ID Token: %w", err)
 	}
-	if err := simpleoidc.RequireOlder(origIdt, reIdt); err != nil {
+	if err := jwsig.RequireOlder(origIdt, reIdt); err != nil {
 		return fmt.Errorf("refreshed ID Token should not be issued before original ID Token: %w", err)
 	}
 
@@ -197,9 +198,9 @@ func NewNonRefreshableOp(op *MockProvider) *NonRefreshableOp {
 	return &NonRefreshableOp{op: op}
 }
 
-func (nro *NonRefreshableOp) RequestTokens(ctx context.Context, cic *clientinstance.Claims) (*simpleoidc.Tokens, error) {
+func (nro *NonRefreshableOp) RequestTokens(ctx context.Context, cic *clientinstance.Claims) (*jwsig.Tokens, error) {
 	tokens, err := nro.op.RequestTokens(ctx, cic)
-	return &simpleoidc.Tokens{IDToken: tokens.IDToken}, err
+	return &jwsig.Tokens{IDToken: tokens.IDToken}, err
 }
 func (nro *NonRefreshableOp) PublicKeyByKeyId(ctx context.Context, keyID string) (*discover.PublicKeyRecord, error) {
 	return nro.op.PublicKeyByKeyId(ctx, keyID)

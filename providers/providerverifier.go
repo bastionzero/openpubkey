@@ -25,9 +25,10 @@ import (
 
 	"github.com/lestrrat-go/jwx/v2/jwa"
 	"github.com/lestrrat-go/jwx/v2/jws"
+
 	"github.com/openpubkey/openpubkey/discover"
 	"github.com/openpubkey/openpubkey/gq"
-	"github.com/openpubkey/openpubkey/oidc"
+	"github.com/openpubkey/openpubkey/jwsig"
 	"github.com/openpubkey/openpubkey/pktoken/clientinstance"
 	"github.com/openpubkey/openpubkey/util"
 )
@@ -101,7 +102,7 @@ func (v *DefaultProviderVerifier) VerifyIDToken(ctx context.Context, idToken []b
 		}
 	}
 
-	idt, err := oidc.NewJwt(idToken)
+	idt, err := jwsig.NewJwt(idToken)
 	if err != nil {
 		return err
 	}
@@ -156,7 +157,7 @@ func (v *DefaultProviderVerifier) providerPublicKey(ctx context.Context, idToken
 	return v.options.DiscoverPublicKey.ByToken(ctx, v.Issuer(), idToken)
 }
 
-func (v *DefaultProviderVerifier) verifyCommitment(idt *oidc.Jwt, cic *clientinstance.Claims) error {
+func (v *DefaultProviderVerifier) verifyCommitment(idt *jwsig.Jwt, cic *clientinstance.Claims) error {
 	var claims map[string]any
 	payload, err := util.Base64DecodeForJWT([]byte(idt.GetPayload()))
 	if err != nil {
@@ -216,7 +217,7 @@ func (v *DefaultProviderVerifier) verifyCommitment(idt *oidc.Jwt, cic *clientins
 // verifyGQSig verifies the signature of a PK token with a GQ signature. The
 // parameter issuer should be the issuer of the ProviderVerifier not the
 // issuer of the PK Token
-func (v *DefaultProviderVerifier) verifyGQSig(ctx context.Context, idt *oidc.Jwt) error {
+func (v *DefaultProviderVerifier) verifyGQSig(ctx context.Context, idt *jwsig.Jwt) error {
 	algStr := idt.GetSignature().GetProtectedClaims().Alg
 	if algStr == "" {
 		return fmt.Errorf("missing provider algorithm header")
@@ -281,8 +282,7 @@ func originalTokenHeaders(token []byte) (jws.Headers, error) {
 	return headers, nil
 }
 
-func verifyAudience(idt *oidc.Jwt, clientID string) error {
-
+func verifyAudience(idt *jwsig.Jwt, clientID string) error {
 	if idt.GetClaims().Audience == "" {
 		return fmt.Errorf("missing audience claim")
 	}

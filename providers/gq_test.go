@@ -21,11 +21,12 @@ import (
 	"crypto/rsa"
 	"testing"
 
-	"github.com/openpubkey/openpubkey/gq"
-	"github.com/openpubkey/openpubkey/oidc"
-	"github.com/openpubkey/openpubkey/util"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/exp/maps"
+
+	"github.com/openpubkey/openpubkey/gq"
+	"github.com/openpubkey/openpubkey/jwsig"
+	"github.com/openpubkey/openpubkey/util"
 )
 
 func TestGQ(t *testing.T) {
@@ -103,7 +104,7 @@ func TestGQ(t *testing.T) {
 				require.NoError(t, err)
 				require.True(t, verifies)
 
-				jwt, err := oidc.NewJwt(gqToken)
+				jwt, err := jwsig.NewJwt(gqToken)
 				require.NoError(t, err)
 				typ, err := jwt.GetSignature().GetTyp()
 				require.NoError(t, err)

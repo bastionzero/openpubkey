@@ -25,7 +25,7 @@ import (
 
 	"github.com/awnumar/memguard"
 	"github.com/openpubkey/openpubkey/discover"
-	simpleoidc "github.com/openpubkey/openpubkey/oidc"
+	"github.com/openpubkey/openpubkey/jwsig"
 	"github.com/openpubkey/openpubkey/pktoken/clientinstance"
 )
 
@@ -36,7 +36,7 @@ type GithubOp struct {
 	rawTokenRequestURL        string
 	tokenRequestAuthToken     string
 	publicKeyFinder           discover.PublicKeyFinder
-	requestTokensOverrideFunc func(string) (*simpleoidc.Tokens, error)
+	requestTokensOverrideFunc func(string) (*jwsig.Tokens, error)
 }
 
 var _ OpenIdProvider = (*GithubOp)(nil)
@@ -140,7 +140,7 @@ func (g *GithubOp) requestTokens(ctx context.Context, cicHash string) (*memguard
 	return memguard.NewBufferFromBytes(jwt.Value[1 : len(jwt.Value)-1]), nil
 }
 
-func (g *GithubOp) RequestTokens(ctx context.Context, cic *clientinstance.Claims) (*simpleoidc.Tokens, error) {
+func (g *GithubOp) RequestTokens(ctx context.Context, cic *clientinstance.Claims) (*jwsig.Tokens, error) {
 	// Define our commitment as the hash of the client instance claims
 	commitment, err := cic.Hash()
 	if err != nil {
@@ -159,7 +159,7 @@ func (g *GithubOp) RequestTokens(ctx context.Context, cic *clientinstance.Claims
 	defer idTokenLB.Destroy()
 	gqToken, err := CreateGQToken(ctx, idTokenLB.Bytes(), g)
 
-	return &simpleoidc.Tokens{IDToken: gqToken}, err
+	return &jwsig.Tokens{IDToken: gqToken}, err
 }
 
 func (g *GithubOp) Issuer() string {

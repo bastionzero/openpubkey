@@ -28,9 +28,10 @@ import (
 	mathrand "math/rand"
 
 	"github.com/lestrrat-go/jwx/v2/jwk"
-	"github.com/openpubkey/openpubkey/discover"
-	"github.com/openpubkey/openpubkey/oidc"
 	"golang.org/x/exp/maps"
+
+	"github.com/openpubkey/openpubkey/discover"
+	"github.com/openpubkey/openpubkey/jwsig"
 )
 
 type MockProviderBackend struct {
@@ -93,7 +94,7 @@ func (o *MockProviderBackend) SetIDTokenTemplate(template *IDTokenTemplate) {
 	o.IDTokensTemplate = template
 }
 
-func (o *MockProviderBackend) RequestTokensOverrideFunc(cicHash string) (*oidc.Tokens, error) {
+func (o *MockProviderBackend) RequestTokensOverrideFunc(cicHash string) (*jwsig.Tokens, error) {
 	o.IDTokensTemplate.AddCommit(cicHash)
 	return o.IDTokensTemplate.IssueToken()
 }

@@ -20,7 +20,7 @@ import (
 	"bytes"
 	"fmt"
 
-	"github.com/openpubkey/openpubkey/oidc"
+	"github.com/openpubkey/openpubkey/jwsig"
 )
 
 // CompactPKToken creates a compact representation of a PK Token from a list of tokens
@@ -32,7 +32,7 @@ func CompactPKToken(tokens [][]byte, freshIDToken []byte) ([]byte, error) {
 	compact := [][]byte{}
 	var payload []byte
 	for _, tok := range tokens {
-		tokProtected, tokPayload, tokSig, err := oidc.SplitCompact(tok)
+		tokProtected, tokPayload, tokSig, err := jwsig.SplitCompact(tok)
 		if err != nil {
 			return nil, err
 		}

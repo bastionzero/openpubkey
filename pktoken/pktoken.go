@@ -26,9 +26,8 @@ import (
 	"github.com/lestrrat-go/jwx/v2/jwa"
 	"github.com/lestrrat-go/jwx/v2/jws"
 
-	"github.com/openpubkey/openpubkey/oidc"
+	"github.com/openpubkey/openpubkey/jwsig"
 	"github.com/openpubkey/openpubkey/pktoken/clientinstance"
-
 	"github.com/openpubkey/openpubkey/util"
 
 	_ "golang.org/x/crypto/sha3"
@@ -88,7 +87,7 @@ func NewFromCompact(pktCom []byte) (*PKToken, error) {
 	pkt := &PKToken{}
 
 	for _, token := range tokens {
-		parsedToken, err := oidc.NewJwt(token)
+		parsedToken, err := jwsig.NewJwt(token)
 		if err != nil {
 			return nil, err
 		}
@@ -256,9 +255,9 @@ func (p *PKToken) Compact() ([]byte, error) {
 }
 
 func (p *PKToken) MarshalJSON() ([]byte, error) {
-	rawJws := oidc.Jws{
+	rawJws := jwsig.Jws{
 		Payload:    string(util.Base64EncodeForJWT(p.Payload)),
-		Signatures: []oidc.Signature{},
+		Signatures: []jwsig.Signature{},
 	}
 	var opPublicHeader map[string]any
 	var err error
@@ -267,7 +266,7 @@ func (p *PKToken) MarshalJSON() ([]byte, error) {
 			return nil, err
 		}
 	}
-	if err = rawJws.AddSignature(p.OpToken, oidc.WithPublicHeader(opPublicHeader)); err != nil {
+	if err = rawJws.AddSignature(p.OpToken, jwsig.WithPublicHeader(opPublicHeader)); err != nil {
 		return nil, err
 	}
 	if err = rawJws.AddSignature(p.CicToken); err != nil {
@@ -282,7 +281,7 @@ func (p *PKToken) MarshalJSON() ([]byte, error) {
 }
 
 func (p *PKToken) UnmarshalJSON(data []byte) error {
-	var rawJws oidc.Jws
+	var rawJws jwsig.Jws
 	if err := json.Unmarshal(data, &rawJws); err != nil {
 		return err
 	}

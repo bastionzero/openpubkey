@@ -23,15 +23,13 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/stretchr/testify/require"
-
-	"github.com/openpubkey/openpubkey/oidc"
-	"github.com/openpubkey/openpubkey/pktoken"
-	"github.com/openpubkey/openpubkey/pktoken/mocks"
-
 	"github.com/lestrrat-go/jwx/v2/jwa"
 	"github.com/lestrrat-go/jwx/v2/jwk"
+	"github.com/stretchr/testify/require"
 
+	"github.com/openpubkey/openpubkey/jwsig"
+	"github.com/openpubkey/openpubkey/pktoken"
+	"github.com/openpubkey/openpubkey/pktoken/mocks"
 	"github.com/openpubkey/openpubkey/util"
 )
 
@@ -166,7 +164,7 @@ func testUnchanged(t *testing.T, payload string, opPheader string, cicPheader st
 	require.NoError(t, err)
 
 	// Unmarshal it into a simple JWS structure to see if the underlying values have changed
-	var simpleJWS oidc.Jws
+	var simpleJWS jwsig.Jws
 	err = json.Unmarshal(pktJson, &simpleJWS)
 	require.NoError(t, err)
 

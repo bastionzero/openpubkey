@@ -23,7 +23,8 @@ import (
 
 	"github.com/lestrrat-go/jwx/v2/jwa"
 	"github.com/lestrrat-go/jwx/v2/jws"
-	"github.com/openpubkey/openpubkey/oidc"
+
+	"github.com/openpubkey/openpubkey/jwsig"
 )
 
 type CommitmentType struct {
@@ -67,7 +68,7 @@ func (t *IDTokenTemplate) AddCommit(cicHash string) {
 }
 
 // TODO: Rename to IssueTokens
-func (t *IDTokenTemplate) IssueToken() (*oidc.Tokens, error) {
+func (t *IDTokenTemplate) IssueToken() (*jwsig.Tokens, error) {
 
 	headers := jws.NewHeaders()
 	if !t.NoAlg {
@@ -125,7 +126,7 @@ func (t *IDTokenTemplate) IssueToken() (*oidc.Tokens, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &oidc.Tokens{
+	return &jwsig.Tokens{
 		IDToken:      idToken,
 		RefreshToken: []byte("mock-refresh-token"),
 		AccessToken:  []byte("mock-access-token")}, nil

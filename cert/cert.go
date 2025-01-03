@@ -28,7 +28,7 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/openpubkey/openpubkey/oidc"
+	"github.com/openpubkey/openpubkey/jwsig"
 	"github.com/openpubkey/openpubkey/pktoken"
 )
 
@@ -60,7 +60,7 @@ func PktToX509Template(pkt *pktoken.PKToken) (*x509.Certificate, error) {
 	}
 
 	// get subject identifier from pk token
-	idtClaims := new(oidc.OidcClaims)
+	idtClaims := new(jwsig.OidcClaims)
 	if err := json.Unmarshal(pkt.Payload, idtClaims); err != nil {
 		return nil, err
 	}
