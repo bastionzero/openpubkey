@@ -84,7 +84,14 @@ func login(outputDir string, gqSign bool) error {
 	opOptions := providers.GetDefaultGoogleOpOptions()
 	opOptions.GQSign = gqSign
 	op := providers.NewGoogleOpWithOptions(opOptions)
-	opkClient, err := client.New(op)
+
+	// TODO: switch back. This is temporary test code for the new webchooser
+	opChooser := providers.NewWebChooser([]providers.BrowserOpenIdProvider{op})
+	opkClient, err := client.New(opChooser)
+
+	// opkClient, err := client.New(op)
+	// opChooser := choosers.NewWebChooser([]providers.BrowserOpenIdProvider{op})
+	// opkClient, err := client.NewFromChooser(opChooser)
 	if err != nil {
 		return err
 	}

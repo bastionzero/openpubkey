@@ -25,7 +25,6 @@ import (
 	"github.com/lestrrat-go/jwx/v2/jwa"
 	"github.com/lestrrat-go/jwx/v2/jwk"
 
-	"github.com/openpubkey/openpubkey/cosigner"
 	"github.com/openpubkey/openpubkey/pktoken"
 	"github.com/openpubkey/openpubkey/pktoken/clientinstance"
 	"github.com/openpubkey/openpubkey/providers"
@@ -79,13 +78,6 @@ func WithCosignerProvider(cosP *CosignerProvider) ClientOpts {
 	}
 }
 
-// WithCustomVerifier specifies a custom verifier to use instead of default
-func WithCustomVerifier(verifier PKTokenVerifier) ClientOpts {
-	return func(o *OpkClient) {
-		o.verifier = verifier
-	}
-}
-
 // New returns a new client.OpkClient. The op argument should be the
 // OpenID Provider you want to authenticate against.
 func New(op OpenIdProvider, opts ...ClientOpts) (*OpkClient, error) {
@@ -114,23 +106,6 @@ func New(op OpenIdProvider, opts ...ClientOpts) (*OpkClient, error) {
 			return nil, fmt.Errorf("failed to create key pair for client: %w ", err)
 		}
 		client.signer = signer
-	}
-
-	// If there is no provided client verifier, create our default
-	if client.verifier == nil {
-		var pktVerifier *verifier.Verifier
-		var err error
-		if client.cosP != nil {
-			cosignerVerifier := cosigner.NewCosignerVerifier(client.cosP.Issuer, cosigner.CosignerVerifierOpts{})
-			pktVerifier, err = verifier.New(op, verifier.WithCosignerVerifiers(cosignerVerifier))
-		} else {
-			pktVerifier, err = verifier.New(op)
-		}
-
-		if err != nil {
-			return nil, err
-		}
-		client.verifier = pktVerifier
 	}
 
 	return client, nil

@@ -41,6 +41,7 @@ type OpenIdProvider interface {
 type BrowserOpenIdProvider interface {
 	OpenIdProvider
 	HookHTTPSession(h http.HandlerFunc)
+	ReuseBrowserWindowHook(chan string)
 }
 
 // Interface for an OpenIdProvider that returns an ID Token, Refresh Token and Access Token
