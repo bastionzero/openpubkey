@@ -48,7 +48,6 @@ type OpkClient struct {
 	pkToken      *pktoken.PKToken
 	refreshToken []byte
 	accessToken  []byte
-	verifier     PKTokenVerifier
 }
 
 // ClientOpts contains options for constructing an OpkClient
