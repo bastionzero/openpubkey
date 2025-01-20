@@ -35,7 +35,6 @@ type Server struct {
 
 func NewChooserServer() (*Server, error) {
 	server := &Server{}
-
 	mux := http.NewServeMux()
 	mux.Handle("/", http.FileServer(http.Dir("chooser/static")))
 	err := http.ListenAndServe(":3003", mux)
@@ -55,75 +54,69 @@ type WebChooser struct {
 	OpenBrowser bool
 }
 
-func (wc *WebChooser) openChooser() (BrowserOpenIdProvider, error) {
-	listener, err := net.Listen("tcp", "localhost:0")
-	if err != nil {
-		return nil, fmt.Errorf("failed to bind to an available port: %w", err)
-	}
-
-	// Parse the HTML template
-	tmpl := template.New("abc")
-	tmpl, err = tmpl.Parse(templateHtml)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse template: %w", err)
-	}
-
-	mux := http.NewServeMux()
-	mux.HandleFunc("/choose", func(w http.ResponseWriter, r *http.Request) {
-		data := struct {
-			GoogleUri string
-		}{
-			GoogleUri: "/google",
-		}
-		w.Header().Set("Content-Type", "text/html")
-		if err := tmpl.Execute(w, data); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-		}
-	})
-
-	if wc.OpenBrowser {
-		loginURI := fmt.Sprintf("http://%s/choose", listener.Addr().String())
-		logrus.Infof("Opening browser to %s", loginURI)
-		if err := util.OpenUrl(loginURI); err != nil {
-			logrus.Errorf("Failed to open url: %v", err)
-		}
-	}
-
-	opNameCh := make(chan string, 1)
-
-	mux.HandleFunc("/google", func(w http.ResponseWriter, r *http.Request) {
-		op := wc.OpList[0]
-		opNameCh <- "google"
-
-		redirCh := make(chan string, 1)
-		op.ReuseBrowserWindowHook(redirCh)
-		redirectUri := <-redirCh
-		http.Redirect(w, r, redirectUri, http.StatusFound)
-	})
-
-	server := &http.Server{Handler: mux}
-	go func() {
-		err := server.Serve(listener)
-		if err != nil && err != http.ErrServerClosed {
-			logrus.Error(err)
-		}
-	}()
-
-	opName := <-opNameCh
-	switch opName {
-	case "google":
-		return wc.OpList[0], nil
-	default:
-		return nil, fmt.Errorf("unknown opName: %s", opName)
-	}
-
-}
-
 func (wc *WebChooser) RequestTokens(ctx context.Context, cic *clientinstance.Claims) (*simpleoidc.Tokens, error) {
+
 	if wc.opSelected == nil {
-		var err error
-		if wc.opSelected, err = wc.openChooser(); err != nil {
-			return nil, err
+		// Parse the HTML template
+		tmpl, err := template.New("abc").Parse(templateHtml)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse template: %w", err)
+		}
+
+		listener, err := net.Listen("tcp", "localhost:0")
+		if err != nil {
+			return nil, fmt.Errorf("failed to bind to an available port: %w", err)
+		}
+
+		mux := http.NewServeMux()
+		server := &http.Server{Handler: mux}
+		mux.HandleFunc("/choose", func(w http.ResponseWriter, r *http.Request) {
+			data := struct {
+				GoogleUri string
+			}{
+				GoogleUri: "/google",
+			}
+			w.Header().Set("Content-Type", "text/html")
+			if err := tmpl.Execute(w, data); err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+			}
+		})
+
+		if wc.OpenBrowser {
+			loginURI := fmt.Sprintf("http://%s/choose", listener.Addr().String())
+			logrus.Infof("Opening browser to %s", loginURI)
+			if err := util.OpenUrl(loginURI); err != nil {
+				logrus.Errorf("Failed to open url: %v", err)
+			}
+		}
+
+		opNameCh := make(chan string, 1)
+		mux.HandleFunc("/google", func(w http.ResponseWriter, r *http.Request) {
+			op := wc.OpList[0]
+			opNameCh <- "google"
+			redirCh := make(chan string, 1)
+			op.ReuseBrowserWindowHook(redirCh)
+			redirectUri := <-redirCh
+			http.Redirect(w, r, redirectUri, http.StatusFound)
+		})
+
+		go func() {
+			err := server.Serve(listener)
+			if err != nil && err != http.ErrServerClosed {
+				logrus.Error(err)
+			}
+		}()
+		opName := <-opNameCh
+
+		if err := server.Shutdown(ctx); err != nil {
+			logrus.Errorf("Failed to shutdown http server: %v", err)
+		}
+
+		switch opName {
+		case "google": // TODO: Get the button from op
+			wc.opSelected = wc.OpList[0]
+		default:
+			return nil, fmt.Errorf("unknown opName: %s", opName)
 		}
 	}
 	return wc.opSelected.RequestTokens(ctx, cic)

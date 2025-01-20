@@ -41,6 +41,8 @@ type OpenIdProvider interface {
 type BrowserOpenIdProvider interface {
 	OpenIdProvider
 	HookHTTPSession(h http.HandlerFunc)
+	RefreshTokens(ctx context.Context, refreshToken []byte) (*simpleoidc.Tokens, error)
+	VerifyRefreshedIDToken(ctx context.Context, origIdt []byte, reIdt []byte) error
 	ReuseBrowserWindowHook(chan string)
 }
 
