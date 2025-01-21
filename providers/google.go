@@ -94,6 +94,7 @@ type GoogleOp struct {
 	publicKeyFinder           discover.PublicKeyFinder
 	requestTokensOverrideFunc func(string) (*simpleoidc.Tokens, error)
 	httpSessionHook           http.HandlerFunc
+	reuseBrowserWindowHook    chan string
 }
 
 func GetDefaultGoogleOpOptions() *GoogleOptions {
@@ -248,8 +249,13 @@ func (g *GoogleOp) requestTokens(ctx context.Context, cicHash string) (*simpleoi
 		}
 	}()
 
-	if g.OpenBrowser {
-		loginURI := fmt.Sprintf("http://localhost:%s/login", redirectURI.Port())
+	loginURI := fmt.Sprintf("http://localhost:%s/login", redirectURI.Port())
+
+	// If reuseBrowserWindowHook is set, don't open a new browser window
+	// instead redirect the user's existing browser window
+	if g.reuseBrowserWindowHook != nil {
+		g.reuseBrowserWindowHook <- loginURI
+	} else if g.OpenBrowser {
 		logrus.Infof("Opening browser to on http://%s/", loginURI)
 		if err := util.OpenUrl(loginURI); err != nil {
 			logrus.Errorf("Failed to open url: %v", err)
@@ -397,6 +403,14 @@ func (g *GoogleOp) VerifyRefreshedIDToken(ctx context.Context, origIdt []byte, r
 // method is only available to browser based providers.
 func (g *GoogleOp) HookHTTPSession(h http.HandlerFunc) {
 	g.httpSessionHook = h
+}
+
+// ReuseBrowserWindow is needed so that do not open more than one browser window.
+// If we are using a web based OpenID Provider chooser, we have already opened one
+// window on the user's browser. We should reuse that window here rather than
+// opening a second browser window.
+func (g *GoogleOp) ReuseBrowserWindowHook(h chan string) {
+	g.reuseBrowserWindowHook = h
 }
 
 // FindAvailablePort attempts to open a listener on localhost until it finds one or runs out of redirectURIs to try
