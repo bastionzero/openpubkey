@@ -81,10 +81,18 @@ func main() {
 }
 
 func login(outputDir string, gqSign bool) error {
-	opOptions := providers.GetDefaultGoogleOpOptions()
-	opOptions.GQSign = gqSign
-	op := providers.NewGoogleOpWithOptions(opOptions)
-	opkClient, err := client.New(op)
+	googleOpOptions := providers.GetDefaultGoogleOpOptions()
+	googleOpOptions.GQSign = gqSign
+	googleOp := providers.NewGoogleOpWithOptions(googleOpOptions)
+
+	azureOpOptions := providers.GetDefaultAzureOpOptions()
+	azureOpOptions.GQSign = gqSign
+	azureOp := providers.NewAzureOpWithOptions(azureOpOptions)
+
+	// TODO: switch back. This is temporary test code for the new webchooser
+	opChooser := providers.NewWebChooser([]providers.BrowserOpenIdProvider{googleOp, azureOp})
+	opkClient, err := client.NewFromOpChooser(opChooser)
+
 	if err != nil {
 		return err
 	}
@@ -115,7 +123,7 @@ func login(outputDir string, gqSign bool) error {
 	fmt.Println("Compact", len(pktCom), string(pktCom))
 
 	// Verify that PK Token is issued by the OP you wish to use and that it has a refreshed ID Token
-	pktVerifier, err := verifier.New(op, verifier.RequireRefreshedIDToken())
+	pktVerifier, err := verifier.New(googleOp, verifier.AddProviderVerifiers(azureOp), verifier.RequireRefreshedIDToken())
 	if err != nil {
 		return err
 	}

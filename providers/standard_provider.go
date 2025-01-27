@@ -47,6 +47,7 @@ type StandardOp struct {
 	publicKeyFinder           discover.PublicKeyFinder
 	requestTokensOverrideFunc func(string) (*simpleoidc.Tokens, error)
 	httpSessionHook           http.HandlerFunc
+	reuseBrowserWindowHook    chan string
 }
 
 var _ OpenIdProvider = (*StandardOp)(nil)
@@ -114,8 +115,7 @@ func (s *StandardOp) requestTokens(ctx context.Context, cicHash string) (*simple
 		// Results in better UX than just automatically dropping them into their
 		// only signed in account.
 		// See prompt parameter in OIDC spec https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest
-		rp.WithPromptURLParam("select_account"),
-		rp.WithPromptURLParam("consent"), // This ensures we always get a refreshed ID Token
+		rp.WithPromptURLParam("consent"),
 		rp.WithURLParam("access_type", "offline")),
 	)
 
@@ -151,8 +151,13 @@ func (s *StandardOp) requestTokens(ctx context.Context, cicHash string) (*simple
 		}
 	}()
 
-	if s.OpenBrowser {
-		loginURI := fmt.Sprintf("http://localhost:%s/login", redirectURI.Port())
+	loginURI := fmt.Sprintf("http://localhost:%s/login", redirectURI.Port())
+
+	// If reuseBrowserWindowHook is set, don't open a new browser window
+	// instead redirect the user's existing browser window
+	if s.reuseBrowserWindowHook != nil {
+		s.reuseBrowserWindowHook <- loginURI
+	} else if s.OpenBrowser {
 		logrus.Infof("Opening browser to on http://%s/", loginURI)
 		if err := util.OpenUrl(loginURI); err != nil {
 			logrus.Errorf("Failed to open url: %v", err)
@@ -301,4 +306,12 @@ func (s *StandardOp) VerifyRefreshedIDToken(ctx context.Context, origIdt []byte,
 // method is only available to browser based providers.
 func (s *StandardOp) HookHTTPSession(h http.HandlerFunc) {
 	s.httpSessionHook = h
+}
+
+// ReuseBrowserWindow is needed so that do not open more than one browser window.
+// If we are using a web based OpenID Provider chooser, we have already opened one
+// window on the user's browser. We should reuse that window here rather than
+// opening a second browser window.
+func (s *StandardOp) ReuseBrowserWindowHook(h chan string) {
+	s.reuseBrowserWindowHook = h
 }

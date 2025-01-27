@@ -73,8 +73,8 @@ func GetDefaultAzureOpOptions() *AzureOptions {
 	return &AzureOptions{
 		Issuer:   azureIssuer(defaultTenantID),
 		ClientID: "bd345b9c-6902-400d-9e18-45abdf0f698f", // TODO: replace with a better client ID
-
-		// Scopes: []string{"openid profile email", "offline_access"}, // offline_access is required for refresh tokens
+		// Scopes:   []string{"openid profile email"},
+		Scopes: []string{"openid profile email offline_access"}, // offline_access is required for refresh tokens
 		RedirectURIs: []string{
 			"http://localhost:3000/login-callback",
 			"http://localhost:10001/login-callback",

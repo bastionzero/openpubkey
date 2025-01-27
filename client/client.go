@@ -25,7 +25,6 @@ import (
 	"github.com/lestrrat-go/jwx/v2/jwa"
 	"github.com/lestrrat-go/jwx/v2/jwk"
 
-	"github.com/openpubkey/openpubkey/cosigner"
 	"github.com/openpubkey/openpubkey/pktoken"
 	"github.com/openpubkey/openpubkey/pktoken/clientinstance"
 	"github.com/openpubkey/openpubkey/providers"
@@ -43,13 +42,13 @@ type PKTokenVerifier interface {
 
 type OpkClient struct {
 	Op           OpenIdProvider
+	OpChooser    *providers.WebChooser
 	cosP         *CosignerProvider
 	signer       crypto.Signer
 	alg          jwa.KeyAlgorithm
 	pkToken      *pktoken.PKToken
 	refreshToken []byte
 	accessToken  []byte
-	verifier     PKTokenVerifier
 }
 
 // ClientOpts contains options for constructing an OpkClient
@@ -79,10 +78,12 @@ func WithCosignerProvider(cosP *CosignerProvider) ClientOpts {
 	}
 }
 
-// WithCustomVerifier specifies a custom verifier to use instead of default
-func WithCustomVerifier(verifier PKTokenVerifier) ClientOpts {
-	return func(o *OpkClient) {
-		o.verifier = verifier
+func NewFromOpChooser(opChooser *providers.WebChooser, opts ...ClientOpts) (*OpkClient, error) {
+	if client, err := New(nil, opts...); err != nil {
+		return nil, err
+	} else {
+		client.OpChooser = opChooser
+		return client, nil
 	}
 }
 
@@ -114,23 +115,6 @@ func New(op OpenIdProvider, opts ...ClientOpts) (*OpkClient, error) {
 			return nil, fmt.Errorf("failed to create key pair for client: %w ", err)
 		}
 		client.signer = signer
-	}
-
-	// If there is no provided client verifier, create our default
-	if client.verifier == nil {
-		var pktVerifier *verifier.Verifier
-		var err error
-		if client.cosP != nil {
-			cosignerVerifier := cosigner.NewCosignerVerifier(client.cosP.Issuer, cosigner.CosignerVerifierOpts{})
-			pktVerifier, err = verifier.New(op, verifier.WithCosignerVerifiers(cosignerVerifier))
-		} else {
-			pktVerifier, err = verifier.New(op)
-		}
-
-		if err != nil {
-			return nil, err
-		}
-		client.verifier = pktVerifier
 	}
 
 	return client, nil
@@ -167,6 +151,19 @@ func (o *OpkClient) Auth(ctx context.Context, opts ...AuthOpts) (*pktoken.PKToke
 	}
 	for _, applyOpt := range opts {
 		applyOpt(authOpts)
+	}
+
+	if o.OpChooser != nil && o.Op != nil {
+		return nil, fmt.Errorf("op and opChooser can't both be set selected")
+	}
+
+	// If an OpChooser is set then use it to select the OP (OpenID Provider) to use
+	if o.OpChooser != nil {
+		if opSelected, err := o.OpChooser.ChooseOp(ctx); err != nil {
+			return nil, err
+		} else {
+			o.Op = opSelected
+		}
 	}
 
 	// If no Cosigner is set then do standard OIDC authentication
