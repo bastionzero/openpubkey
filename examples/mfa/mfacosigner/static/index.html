@@ -50,7 +50,7 @@
         }
 
         async function register(authid) {
-            let response = await fetch(`/register/begin?authid=${authid}`, {
+            let response = await fetch(`/v1/register/begin?authid=${authid}`, {
                 method: 'GET'
             });
 
@@ -74,7 +74,7 @@
             };
 
             // Send credentials back to server to save
-            let res = await fetch(`/register/finish?authid=${authid}`, {
+            let res = await fetch(`/v1/register/finish?authid=${authid}`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -88,7 +88,7 @@
         }
 
         async function login(authid) {
-            let response = await fetch(`/login/begin?authid=${authid}`, {
+            let response = await fetch(`/v1/login/begin?authid=${authid}`, {
                 method: 'GET'
             });
 
@@ -105,7 +105,7 @@
             let assertion = await navigator.credentials.get(data);
 
             // Send credentials back to server to save
-            let res = await fetch(`/login/finish?authid=${authid}`, {
+            let res = await fetch(`/v1/login/finish?authid=${authid}`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -138,7 +138,7 @@
             let searchParams = new URLSearchParams(queryString);
             const authid = searchParams.get('authid')
             
-            const response = await fetch(`/check-registration?authid=${authid}`, {
+            const response = await fetch(`/v1/check-registration?authid=${authid}`, {
                 method: 'GET',
             });
 

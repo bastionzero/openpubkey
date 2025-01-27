@@ -30,6 +30,8 @@ import (
 	"strings"
 	"time"
 
+	"golang.org/x/exp/slices"
+
 	"github.com/lestrrat-go/jwx/v2/jws"
 	"github.com/openpubkey/openpubkey/cosigner/msgs"
 	"github.com/openpubkey/openpubkey/pktoken"
@@ -43,6 +45,30 @@ type CosignerProvider struct {
 }
 
 func (c *CosignerProvider) RequestToken(ctx context.Context, signer crypto.Signer, pkt *pktoken.PKToken, redirCh chan string) (*pktoken.PKToken, error) {
+	wellKnownConf, err := c.ReqKnownConf()
+	if err != nil {
+		return nil, err
+	}
+
+	ver, err := c.findCompatibleVersion(wellKnownConf.Versions)
+	if err != nil {
+		return nil, err
+	}
+
+	switch ver {
+	case "v1":
+		return c.requestTokenV1(ctx, signer, pkt, redirCh)
+	default:
+		return nil, fmt.Errorf("cosigner protocol version '%s' is unsupported by client", ver)
+	}
+}
+
+func (c *CosignerProvider) requestTokenV1(ctx context.Context, signer crypto.Signer, pkt *pktoken.PKToken, redirCh chan string) (*pktoken.PKToken, error) {
+	apiBaseUrl, err := c.apiBaseUrl("v1", c.Issuer)
+	if err != nil {
+		return nil, err
+	}
+
 	// Find an unused port
 	listener, err := net.Listen("tcp", ":0")
 	if err != nil {
@@ -79,10 +105,7 @@ func (c *CosignerProvider) RequestToken(ctx context.Context, signer crypto.Signe
 				if err != nil {
 					return nil, fmt.Errorf("cosigner client hit error when building authcode URI: %w", err)
 				}
-				authcodeSigUri, err := c.authcodeURI(sig2)
-				if err != nil {
-					return nil, fmt.Errorf("cosigner client hit error when building authcode URI: %w", err)
-				}
+				authcodeSigUri := c.authcodeURI(apiBaseUrl, sig2)
 				res, err := http.Get(authcodeSigUri)
 				if err != nil {
 					return nil, fmt.Errorf("error requesting MFA cosigner signature: %w", err)
@@ -158,11 +181,7 @@ func (c *CosignerProvider) RequestToken(ctx context.Context, signer crypto.Signe
 	if err != nil {
 		return nil, fmt.Errorf("cosigner client hit error init auth signed message: %w", err)
 	}
-
-	redirUri, err := c.initAuthURI(pktJson, sig1)
-	if err != nil {
-		return nil, fmt.Errorf("cosigner client hit error when building init auth URI: %w", err)
-	}
+	redirUri := c.initAuthURI(apiBaseUrl, pktJson, sig1)
 
 	select {
 	// Trigger redirect of user's browser window to a URI controlled by the Cosigner sending the PK Token in the URI
@@ -188,35 +207,35 @@ func (c *CosignerProvider) RequestToken(ctx context.Context, signer crypto.Signe
 	}
 }
 
-func (c *CosignerProvider) initAuthURI(pktJson []byte, sig1 []byte) (string, error) {
+func (c *CosignerProvider) initAuthURI(apiURI *url.URL, pktJson []byte, sig1 []byte) string {
 	pktB63 := util.Base64EncodeForJWT(pktJson)
-	if uri, err := url.Parse(c.Issuer); err != nil {
-		return "", err
-	} else {
-		uri := uri.JoinPath("mfa-auth-init")
-		v := uri.Query()
-		v.Add("pkt", string(pktB63))
-		v.Add("sig1", string(sig1))
-		uri.RawQuery = v.Encode()
+	uri := apiURI.JoinPath("mfa-auth-init")
+	v := uri.Query()
+	v.Add("pkt", string(pktB63))
+	v.Add("sig1", string(sig1))
+	uri.RawQuery = v.Encode()
 
-		// URI Should be: https://<issuer>/mfa-auth-init?pkt=<pktJsonB64>&sig1=<sig1>
-		return uri.String(), nil
-	}
+	// URI Should be: https://<issuer>/mfa-auth-init?pkt=<pktJsonB64>&sig1=<sig1>
+	return uri.String()
 }
 
-func (c *CosignerProvider) authcodeURI(sig2 []byte) (string, error) {
-	if uri, err := url.Parse(c.Issuer); err != nil {
-		return "", err
-	} else {
-		uri := uri.JoinPath("sign")
-		v := uri.Query()
-		v.Add("sig2", string(sig2))
-		uri.RawQuery = v.Encode()
-
-		// URI Should be: https://<issuer>/sign?&sig2=<sig2>
-		return uri.String(), nil
+// Constructs the base URI for the cosigner API calls e.g., https://cos.example.com/v1
+func (c *CosignerProvider) apiBaseUrl(version string, issuer string) (*url.URL, error) {
+	issuerUri, err := url.Parse(issuer)
+	if err != nil {
+		return nil, err
 	}
+	return issuerUri.JoinPath(version), nil
+}
 
+func (c *CosignerProvider) authcodeURI(apiUri *url.URL, sig2 []byte) string {
+	uri := apiUri.JoinPath("sign")
+	v := uri.Query()
+	v.Add("sig2", string(sig2))
+	uri.RawQuery = v.Encode()
+
+	// URI Should be: https://<issuer>/<version>/sign?&sig2=<sig2>
+	return uri.String()
 }
 
 func (c *CosignerProvider) ValidateCos(cosSig []byte, expectedNonce string, expectedRedirectURI string) error {
@@ -285,4 +304,58 @@ func (c *CosignerProvider) CreateInitAuthSig(redirectURI string) ([]byte, string
 		return nil, "", err
 	}
 	return msgJson, nonce, nil
+}
+
+// TODO: have this live in one place
+type WellKnown struct {
+	Issuer   string   `json:"issuer"`
+	JwksUri  string   `json:"jwks_uri"`
+	Versions []string `json:"versions_supported"`
+}
+
+func (c *CosignerProvider) ReqKnownConf() (*WellKnown, error) {
+	issuerUri, err := url.Parse(c.Issuer)
+	if err != nil {
+		return nil, err
+	}
+	wellKnownConf, err := issuerUri.JoinPath("/.well-known/openpubkey-configuration"), nil
+	if err != nil {
+		return nil, err
+	}
+
+	wkURI := wellKnownConf.String()
+	res, err := http.Get(wkURI)
+	if err != nil {
+		return nil, fmt.Errorf("error requesting well-known/openpubkey-configuration: %w", err)
+	}
+	resBody, err := io.ReadAll(res.Body)
+	if err != nil {
+		return nil, fmt.Errorf("error reading well-known/openpubkey-configuration: %w", err)
+	}
+	var wk WellKnown
+	err = json.Unmarshal(resBody, &wk)
+	if err != nil {
+		return nil, err
+	}
+	return &wk, nil
+}
+
+func (c *CosignerProvider) findCompatibleVersion(serverVersions []string) (string, error) {
+	noneVer := "none"
+
+	ourVersions := []string{"v1"}
+	cosignerVersions := serverVersions
+
+	versionToUse := noneVer
+	for _, ver := range ourVersions {
+		if slices.Contains(cosignerVersions, ver) {
+			versionToUse = ver
+		}
+	}
+	if versionToUse == "none" {
+		return versionToUse, fmt.Errorf(
+			"no compatible cosigner version, we support [%s], cosigner supports [%s]",
+			strings.Join(ourVersions, ","), strings.Join(cosignerVersions, ","))
+	}
+	return versionToUse, nil
 }
