@@ -267,6 +267,10 @@ func (s *StandardOp) Issuer() string {
 	return s.issuer
 }
 
+func (s *StandardOp) SetIssuer(issuer string) {
+	s.issuer = issuer //TODO: Make issuer a public value and get rid of this function
+}
+
 func (s *StandardOp) VerifyIDToken(ctx context.Context, idt []byte, cic *clientinstance.Claims) error {
 	vp := NewProviderVerifier(s.issuer, ProviderVerifierOpts{CommitType: CommitTypesEnum.NONCE_CLAIM, ClientID: s.ClientID, DiscoverPublicKey: &s.publicKeyFinder})
 	return vp.VerifyIDToken(ctx, idt, cic)
