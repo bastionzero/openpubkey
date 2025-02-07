@@ -1,0 +1,52 @@
+name: CI
+
+# Runs CI for pull requests and pushes to main
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  # schedule:
+  #   - cron: 0 14 * * MON-FRI # Every weekday at 14:00 UTC
+
+jobs:
+  # Check that binary can be built
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    strategy:
+      matrix:
+        go-version: [1.21.x]
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+    - name: Install Go
+      uses: actions/setup-go@0c52d547c9bc32b1aa3301fd7a9cb496313a4491 # v5.0.0
+      with:
+        go-version: ${{ matrix.go-version }}
+    - name: Install dependencies
+      run: go mod download
+    - name: Build
+      run: go build -v
+  # Run integration tests
+  test:
+    needs: build
+    name: 'Integration Tests'
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+    - name: Setup rootless Docker
+      uses: ScribeMD/rootless-docker@6bd157a512c2fafa4e0243a8aa87d964eb890886  # v0.2.2
+    - name: Remove Docker root socket
+      run: sudo rm -rf /var/run/docker.sock
+    - name: Checkout
+      uses: actions/checkout@v4
+    - name: Install Go
+      uses: actions/setup-go@0c52d547c9bc32b1aa3301fd7a9cb496313a4491 # v5.0.0
+      with:
+        go-version-file: 'go.mod'
+    - name: Install dependencies
+      run: go mod download
+    - name: Run integration tests
+      run: go test -tags=integration ./test/integration -timeout=15m -count=1 -parallel=2 -v
