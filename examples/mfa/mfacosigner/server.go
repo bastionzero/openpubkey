@@ -66,15 +66,19 @@ func NewMfaCosignerHttpServer(serverUri, rpID, rpOrigin, RPDisplayName string) (
 	}
 
 	mux := http.NewServeMux()
+
+	// Static assets don't need to be URL versioned as mfa-auth-init
+	// can redirect to the right URL as needed
 	mux.Handle("/", http.FileServer(http.Dir("mfacosigner/static")))
-	mux.HandleFunc("/mfa-auth-init", server.initAuth)
-	mux.HandleFunc("/check-registration", server.checkIfRegistered)
-	mux.HandleFunc("/register/begin", server.beginRegistration)
-	mux.HandleFunc("/register/finish", server.finishRegistration)
-	mux.HandleFunc("/login/begin", server.beginLogin)
-	mux.HandleFunc("/login/finish", server.finishLogin)
-	mux.HandleFunc("/sign", server.signPkt)
+	mux.HandleFunc("/v1/mfa-auth-init", server.initAuth)
+	mux.HandleFunc("/v1/check-registration", server.checkIfRegistered)
+	mux.HandleFunc("/v1/register/begin", server.beginRegistration)
+	mux.HandleFunc("/v1/register/finish", server.finishRegistration)
+	mux.HandleFunc("/v1/login/begin", server.beginLogin)
+	mux.HandleFunc("/v1/login/finish", server.finishLogin)
+	mux.HandleFunc("/v1/sign", server.signPkt)
 	mux.HandleFunc("/.well-known/openid-configuration", server.wellKnownConf)
+	mux.HandleFunc("/.well-known/openpubkey-configuration", server.wellKnownConf)
 
 	err = http.ListenAndServe(":3003", mux)
 	return server, err
@@ -245,13 +249,15 @@ func (s *Server) signPkt(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) wellKnownConf(w http.ResponseWriter, r *http.Request) {
 	type WellKnown struct {
-		Issuer  string `json:"issuer"`
-		JwksUri string `json:"jwks_uri"`
+		Issuer   string   `json:"issuer"`
+		JwksUri  string   `json:"jwks_uri"`
+		Versions []string `json:"versions_supported"`
 	}
 
 	wk := WellKnown{
-		Issuer:  s.cosigner.Issuer,
-		JwksUri: s.jwksUri,
+		Issuer:   s.cosigner.Issuer,
+		JwksUri:  s.jwksUri,
+		Versions: []string{"v1"},
 	}
 
 	wkJson, err := json.Marshal(wk)
